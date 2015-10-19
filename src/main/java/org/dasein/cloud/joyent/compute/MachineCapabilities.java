@@ -135,6 +135,12 @@ public class MachineCapabilities extends AbstractCapabilities<SmartDataCenter> i
 
     @Nonnull
     @Override
+    public String[] getVirtualMachineReservedUserNames() {
+        return new String[0];
+    }
+
+    @Nonnull
+    @Override
     public Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
         return Requirement.REQUIRED;
     }
@@ -204,6 +210,11 @@ public class MachineCapabilities extends AbstractCapabilities<SmartDataCenter> i
 
     @Override
     public boolean isUserDefinedPrivateIPSupported(){return false;}
+
+    @Override
+    public boolean isRootPasswordSSHKeyEncrypted() throws CloudException, InternalException {
+        return false;
+    }
 
     @Nonnull
     @Override
