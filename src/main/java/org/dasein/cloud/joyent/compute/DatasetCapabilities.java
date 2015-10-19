@@ -113,6 +113,11 @@ public class DatasetCapabilities extends AbstractCapabilities<SmartDataCenter> i
     public boolean supportsImageCopy(){return false;}
 
     @Override
+    public boolean supportsImageRemoval() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
     public boolean supportsImageSharing() throws CloudException, InternalException {
         return false;
     }

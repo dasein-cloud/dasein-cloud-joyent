@@ -65,10 +65,12 @@ public class SmartDataCenter extends AbstractCloud {
     
     public SmartDataCenter() { }
 
-    @Override
-    public @Nonnull synchronized StorageServices getStorageServices() {
-        return new MantaStorageServices(this);
-    }
+// FIXME(stas): 19.10.15 storage services disabled until new java-manta is released (BK update):
+// https://github.com/joyent/java-manta/issues/14
+//    @Override
+//    public @Nonnull synchronized StorageServices getStorageServices() {
+//        return new MantaStorageServices(this);
+//    }
 
     @Override
     public @Nonnull JoyentComputeServices getComputeServices() {

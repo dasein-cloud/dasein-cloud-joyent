@@ -19,9 +19,7 @@
 
 package org.dasein.cloud.joyent.storage;
 
-import org.dasein.cloud.CloudException;
 import org.dasein.cloud.CloudProvider;
-import org.dasein.cloud.examples.ProviderLoader;
 import org.dasein.cloud.joyent.storage.util.MantaStorageTestUtils;
 import org.dasein.cloud.storage.Blob;
 import org.dasein.cloud.storage.BlobStoreSupport;

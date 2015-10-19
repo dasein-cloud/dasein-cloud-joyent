@@ -41,11 +41,7 @@ import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Machine extends AbstractVMSupport<SmartDataCenter> {
     Logger logger = SmartDataCenter.getLogger(Machine.class, "std");
@@ -140,7 +136,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         if( productCache.containsKey(productId) ) {
             return productCache.get(productId);
         }
-        for( VirtualMachineProduct prd : listProducts(Architecture.I64) ) {
+        for( VirtualMachineProduct prd : listProducts(VirtualMachineProductFilterOptions.getInstance()) ) {
             if( prd.getProviderProductId().equals(productId) ) {
                 productCache.put(productId, prd);
                 return prd;
@@ -303,9 +299,13 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
 
 
     @Override
-    public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull String machineImageId) throws InternalException, CloudException {
-        MachineImage image = getProvider().getComputeServices().getImageSupport().getImage(machineImageId);
-        Iterable<VirtualMachineProduct> allProducts = listProducts(image.getArchitecture());
+    public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull String machineImageId, VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
+        MachineImageSupport imageSupport = getProvider().getComputeServices().getImageSupport();
+        MachineImage image = imageSupport.getImage(machineImageId);
+        if( image == null ) {
+            throw new CloudException("Requested " + imageSupport.getCapabilities().getProviderTermForImage(Locale.getDefault(), ImageClass.MACHINE) + " (" + machineImageId + ") cannot be found.");
+        }
+        Iterable<VirtualMachineProduct> allProducts = listProducts(options);
         List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
         long minRamSize = 0L;
         String value = image.getProviderMetadata().get("min_ram");
@@ -327,8 +327,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         return products;
     }
 
-    @Override
-    public @Nonnull Iterable<VirtualMachineProduct> listProducts(VirtualMachineProductFilterOptions options, Architecture architecture) throws InternalException, CloudException {
+    protected @Nonnull Iterable<VirtualMachineProduct> listProducts(VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
         Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), "VM.listProducts", VirtualMachineProduct.class, CacheLevel.REGION_ACCOUNT, TimePeriod.valueOf(1, "day"));
         final Iterable<VirtualMachineProduct> cachedProducts = cache.get(getContext());
         if( cachedProducts != null && cachedProducts.iterator().hasNext() ) {
@@ -660,7 +659,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
                 
                 disk = ob.getInt("disk");
                 ram = ob.getInt("memory");
-                for( VirtualMachineProduct prd : listProducts(vm.getArchitecture()) ) {
+                for( VirtualMachineProduct prd : listProducts(VirtualMachineProductFilterOptions.getInstance().withArchitecture(vm.getArchitecture())) ) {
                     d = prd;
                     boolean isProductSmartOs = prd.getName().contains("smartos");
                     if( prd.getRootVolumeSize().convertTo(Storage.MEGABYTE).intValue() == disk && prd.getRamSize().intValue() == ram ) {
