@@ -26,9 +26,9 @@
     </organization>
 
     <scm>
-        <connection>scm:git:git://github.com/dasein/dasein-cloud-joyent.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/dasein/dasein-cloud-joyent.git</developerConnection>
-        <url>http://github.com/dasein/dasein-cloud-joyent</url>
+        <connection>scm:git:git://github.com/dasein-cloud/dasein-cloud-joyent.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/dasein-cloud/dasein-cloud-joyent.git</developerConnection>
+        <url>http://github.com/dasein-cloud/dasein-cloud-joyent</url>
     </scm>
 
     <dependencies>
