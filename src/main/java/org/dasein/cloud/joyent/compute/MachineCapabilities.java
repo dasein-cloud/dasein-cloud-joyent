@@ -153,6 +153,12 @@ public class MachineCapabilities extends AbstractCapabilities<SmartDataCenter> i
 
     @Nonnull
     @Override
+    public Requirement identifyUsernameRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Nonnull
+    @Override
     public Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.NONE;
     }
