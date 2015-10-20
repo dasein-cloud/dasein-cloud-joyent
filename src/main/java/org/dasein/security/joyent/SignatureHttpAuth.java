@@ -22,8 +22,9 @@ package org.dasein.security.joyent;
 
 import org.apache.http.HttpRequest;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMReader;
-import org.bouncycastle.openssl.PasswordFinder;
+import org.bouncycastle.openssl.*;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
 import org.bouncycastle.util.encoders.Base64;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.ContextRequirements;
@@ -45,6 +46,8 @@ public class SignatureHttpAuth implements JoyentHttpAuth {
     private static final String AUTH_HEADER = "Signature keyId=\"/%s/keys/%s\",algorithm=\"rsa-sha256\",signature=\"%s\"";
     private static final String AUTH_SIGN = "date: %s";
     private static final String SIGN_ALGORITHM = "SHA256WithRSAEncryption";
+
+    private final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
 
     private SmartDataCenter provider;
 
@@ -108,24 +111,22 @@ public class SignatureHttpAuth implements JoyentHttpAuth {
     }
 
     private @Nullable KeyPair getKeyPair(String privateKeyContent, @Nullable final char[] password) throws IOException {
-        InputStream is = new ByteArrayInputStream(privateKeyContent.getBytes());
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        PEMReader pemReader = null;
-        if(password != null){
-            pemReader = new PEMReader(reader, new PasswordFinder(){
-                @Override public char[] getPassword(){
-                    return password;
-                }
-            });
-        }
-        else{
-            pemReader = new PEMReader(reader);
-        }
+        BufferedReader reader = null;
+        PEMParser pemParser = null;
         try {
-             return (KeyPair) pemReader.readObject();
+            InputStream is = new ByteArrayInputStream(privateKeyContent.getBytes());
+            reader = new BufferedReader(new InputStreamReader(is));
+            pemParser = new PEMParser(reader);
+            Object object = pemParser.readObject();
+            if (object instanceof PEMEncryptedKeyPair) {
+                PEMDecryptorProvider decProv = new JcePEMDecryptorProviderBuilder().build(password);
+                return converter.getKeyPair(((PEMEncryptedKeyPair) object).decryptKeyPair(decProv));
+            } else {
+                return converter.getKeyPair((PEMKeyPair) object);
+            }
         } finally {
-            reader.close();
-            pemReader.close();
+            if( reader != null ) reader.close();
+            if( pemParser != null ) pemParser.close();
         }
     }
 }
