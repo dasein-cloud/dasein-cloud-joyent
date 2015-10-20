@@ -297,6 +297,11 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         return Collections.emptyList();
     }
 
+    @Override
+    public @Nonnull Iterable<VirtualMachineProduct> listAllProducts() throws InternalException, CloudException{
+        return listProducts(VirtualMachineProductFilterOptions.getInstance());
+    }
+
 
     @Override
     public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull String machineImageId, VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
