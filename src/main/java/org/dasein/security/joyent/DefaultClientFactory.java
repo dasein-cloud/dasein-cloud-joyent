@@ -47,7 +47,7 @@ public class DefaultClientFactory implements JoyentClientFactory {
     @Override
     public @Nonnull HttpClient getClient(String endpoint) throws CloudException, InternalException {
         if( providerContext == null ) {
-            throw new CloudException("No context was defined for this request");
+            throw new InternalException("No context was defined for this request");
         }
 
         final HttpParams params = new BasicHttpParams();

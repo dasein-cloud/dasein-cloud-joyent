@@ -22,24 +22,38 @@ package org.dasein.security.joyent;
 
 import org.apache.http.HttpRequest;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.*;
+import org.bouncycastle.openssl.PEMDecryptorProvider;
+import org.bouncycastle.openssl.PEMEncryptedKeyPair;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
 import org.bouncycastle.util.encoders.Base64;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.ContextRequirements;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.joyent.SmartDataCenter;
-import org.dasein.cloud.joyent.storage.Manta;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.*;
-import java.security.*;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.Security;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.TimeZone;
 
 public class SignatureHttpAuth implements JoyentHttpAuth {
     private static final DateFormat RFC1123_DATE_FORMAT = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss z");
@@ -58,7 +72,7 @@ public class SignatureHttpAuth implements JoyentHttpAuth {
     @Override
     public void addPreemptiveAuth(@Nonnull HttpRequest request) throws CloudException, InternalException {
         if( provider.getContext() == null ) {
-            throw new CloudException("No context was defined for this request");
+            throw new InternalException("No context was defined for this request");
         }
         Date date = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTime();
         String now = RFC1123_DATE_FORMAT.format(date);

@@ -20,26 +20,18 @@
 package org.dasein.security.joyent;
 
 import org.apache.http.HttpHost;
-import org.apache.http.HttpVersion;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.HttpClient;
-import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
-import org.apache.http.protocol.HTTP;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.joyent.SmartDataCenter;
 
 import javax.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Properties;
 
 public class AuthClientFactory extends DefaultClientFactory implements JoyentClientFactory {
 
@@ -51,7 +43,7 @@ public class AuthClientFactory extends DefaultClientFactory implements JoyentCli
     public @Nonnull HttpClient getClient(String endpoint) throws CloudException, InternalException {
 
         if( endpoint == null ) {
-            throw new CloudException("No cloud endpoint was defined");
+            throw new InternalException("No cloud endpoint was defined");
         }
 
         boolean ssl = endpoint.startsWith("https");
@@ -66,7 +58,7 @@ public class AuthClientFactory extends DefaultClientFactory implements JoyentCli
             }
         }
         catch( URISyntaxException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
         HttpHost targetHost = new HttpHost(uri.getHost(), targetPort, uri.getScheme());
 

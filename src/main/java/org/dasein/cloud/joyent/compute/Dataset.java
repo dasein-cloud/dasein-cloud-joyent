@@ -22,9 +22,20 @@ package org.dasein.cloud.joyent.compute;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.GeneralCloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.compute.*;
+import org.dasein.cloud.InvalidStateException;
+import org.dasein.cloud.ResourceNotFoundException;
+import org.dasein.cloud.compute.AbstractImageSupport;
+import org.dasein.cloud.compute.Architecture;
+import org.dasein.cloud.compute.ImageCapabilities;
+import org.dasein.cloud.compute.ImageClass;
+import org.dasein.cloud.compute.ImageCreateOptions;
+import org.dasein.cloud.compute.ImageFilterOptions;
+import org.dasein.cloud.compute.MachineImage;
+import org.dasein.cloud.compute.MachineImageState;
+import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.joyent.JoyentException;
 import org.dasein.cloud.joyent.JoyentMethod;
@@ -37,8 +48,11 @@ import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Dataset extends AbstractImageSupport<SmartDataCenter> {
     private static final String[] VALID_CAPTURE_OS = {
@@ -71,15 +85,15 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
         try {
             VirtualMachine vm = getProvider().getComputeServices().getVirtualMachineSupport().getVirtualMachine(options.getVirtualMachineId());
             if( vm == null ) {
-                throw new CloudException("Virtual machine not found: " + options.getVirtualMachineId());
+                throw new ResourceNotFoundException("Virtual machine not found: " + options.getVirtualMachineId());
             }
             String originalImageId = vm.getProviderMachineImageId();
             if( originalImageId == null ) {
-                throw new CloudException("Image capture is not supported for this VM, original image is unknown.");
+                throw new GeneralCloudException("Image capture is not supported for this VM, original image is unknown.", CloudErrorType.GENERAL);
             }
             MachineImage originalImage = getImage(originalImageId);
             if( !OWNER_JOYENT.equalsIgnoreCase(originalImage.getProviderOwnerId()) ) {
-                throw new CloudException("Image capture is not supported for VMs launched from custom images.");
+                throw new GeneralCloudException("Image capture is not supported for VMs launched from custom images.", CloudErrorType.GENERAL);
             }
             boolean validOs = false;
             for( String os : VALID_CAPTURE_OS ) {
@@ -89,7 +103,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
                 }
             }
             if( !validOs ) {
-                throw new CloudException("Image capture is not supported for this VM, the OS of the original image is not supported.");
+                throw new GeneralCloudException("Image capture is not supported for this VM, the OS of the original image is not supported.", CloudErrorType.GENERAL);
             }
             if( task != null ) {
                 task.setStartTime(System.currentTimeMillis());
@@ -100,7 +114,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
             String version = "1.0.0";
 
             if( !getCapabilities().canImage(vm.getCurrentState()) ) {
-                throw new CloudException("Server must be stopped before making an image - current state: " + vm.getCurrentState());
+                throw new InvalidStateException("Server must be stopped before making an image - current state: " + vm.getCurrentState());
             }
             JoyentMethod method = new JoyentMethod(getProvider());
             Map<String, Object> post = new HashMap<String, Object>();
@@ -110,7 +124,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
             post.put("version", version);
             String json = method.doPostString(getProvider().getEndpoint(), "images", new JSONObject(post).toString());
             if( json == null ) {
-                throw new CloudException("No image was created");
+                throw new GeneralCloudException("No image was created", CloudErrorType.GENERAL);
             }
 
             MachineImage img = null;
@@ -120,10 +134,10 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
                     img = getImage(jsonObject.getString("id"));
                 }
             } catch( JSONException e ) {
-                throw new CloudException(e);
+                throw new InternalException(e);
             }
             if( img == null ) {
-                throw new CloudException("No image was created");
+                throw new GeneralCloudException("No image was created", CloudErrorType.GENERAL);
             }
 
             if( task != null ) {
@@ -147,7 +161,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
             }
             return toMachineImage(new JSONObject(json));
         } catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -167,7 +181,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
 
             return false;
         } catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -216,7 +230,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
                 }
                 return images;
             } catch( JSONException e ) {
-                throw new CloudException(e);
+                throw new InternalException(e);
             }
         } finally {
             APITrace.end();
@@ -264,7 +278,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
             }
             return images;
         } catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -334,7 +348,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
                 }
             }
         } catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
         //old version only supported public images and did not return owner attribute
         final MachineImage machineImage = MachineImage.getInstance(

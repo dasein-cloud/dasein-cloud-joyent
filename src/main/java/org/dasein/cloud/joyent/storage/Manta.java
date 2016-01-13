@@ -32,7 +32,6 @@ import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.joyent.SmartDataCenter;
 import org.dasein.cloud.storage.*;
 import org.dasein.cloud.util.CacheLevel;
-import org.dasein.cloud.util.NamingConstraints;
 import org.dasein.util.uom.storage.*;
 
 import javax.annotation.Nonnull;
@@ -89,7 +88,7 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
                 mantaClient = getClient();
             }
             catch( IOException e ) {
-                throw new CloudException("Unable to initialise Manta client", e);
+                throw new CommunicationException("Unable to initialise Manta client", e);
             }
             rootPath = "/" + ctx.getAccountNumber() + "/stor";
             publicPath = "/" + ctx.getAccountNumber() + "/public";
@@ -119,44 +118,6 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
     }
 
     /**
-     * Manta supports directories with sub-directories in /:login/stor or /:login/public.
-     *
-     *
-     * @throws CloudException
-     * @throws InternalException
-     * @return
-     */
-    @Override
-    public boolean allowsNestedBuckets() throws CloudException, InternalException {
-        return true;
-    }
-
-    /**
-     * Manta does not support objects on root level. However, user must specify one of two available storage folders:
-     * /:login/stor or /:login/public which will be used as a root level.
-     *
-     * @throws CloudException
-     * @throws InternalException
-     * @return
-     */
-    @Override
-    public boolean allowsRootObjects() throws CloudException, InternalException {
-        return true;
-    }
-
-    /**
-     * Manta allow public sharing using directory /:login/public
-     *
-     * @return
-     * @throws CloudException
-     * @throws InternalException
-     */
-    @Override
-    public boolean allowsPublicSharing() throws CloudException, InternalException {
-        return true;
-    }
-
-    /**
      * Manta deletes directory with content.
      *
      * @param bucket directory path
@@ -171,7 +132,7 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
         try {
             mantaClient.delete(path);
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception deleting folder content", e, CloudErrorType.GENERAL);
         } catch (IOException e) {
             retryRecursively = true;
             logger.debug("Directory is not empty. Delete recursively.", e);
@@ -184,11 +145,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             try {
                 mantaClient.deleteRecursive(path);
             } catch( MantaCryptoException e ) {
-                throw new CloudException(e);
+                throw new GeneralCloudException("Exception deleting folder content", e, CloudErrorType.GENERAL);
             } catch( IOException e ) {
-                throw new CloudException(e);
+                throw new CommunicationException("Exception deleting folder content", e);
             } catch( MantaClientHttpResponseException e ) {
-                throw new CloudException(e);
+                int code = e.getStatusCode();
+                CloudErrorType errorType;
+
+                switch (code) {
+                    case HttpStatus.SC_BAD_REQUEST:
+                        errorType = CloudErrorType.INVALID_USER_DATA;
+                        break;
+                    case HttpStatus.SC_UNAUTHORIZED:
+                    case HttpStatus.SC_FORBIDDEN:
+                        errorType = CloudErrorType.AUTHENTICATION;
+                        break;
+                    case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                        errorType = CloudErrorType.COMMUNICATION;
+                        break;
+                    case 429:
+                        errorType = CloudErrorType.THROTTLING;
+                        break;
+                    default:
+                        errorType = CloudErrorType.GENERAL;
+                        break;
+                }
+                throw new GeneralCloudException("Exception deleting folder content", e, errorType);
             }
         }
     }
@@ -209,11 +191,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
         try {
             mantaClient.putDirectory(toStoragePath(bucket, null, true), null);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception creating bucket", e);
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception creating bucket", e, CloudErrorType.GENERAL);
         } catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception creating bucket", e, errorType);
         }
         return Blob.getInstance(getProvider().getContext().getRegionId(), "", bucket, new Date().getTime());
     }
@@ -362,11 +365,11 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             if (e.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
                 return null;
             }
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception getting object metadata", e, CloudErrorType.GENERAL);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception getting object metadata", e);
         } catch (MantaCryptoException e) {
-            throw new InternalException(e);
+            throw new GeneralCloudException("Exception getting object metadata", e, CloudErrorType.GENERAL);
         }
     }
 
@@ -376,80 +379,6 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             o = getMantaObjectMetadata(bucket, object, false);
         }
         return o;
-    }
-
-    /**
-     * According to this <a href=http://apidocs.joyent.com/manta/#directories>doc</a> there is no limit for directories
-     * and sub-directories.
-     *
-     * @return max directories
-     * @throws CloudException
-     * @throws InternalException
-     */
-    @Override
-    public int getMaxBuckets() throws CloudException, InternalException {
-        return Integer.MAX_VALUE;
-    }
-
-    /**
-     * According to this <a href=http://apidocs.joyent.com/manta/#directories>doc</a> there is no limit for object size.
-     * @return max object size
-     * @throws InternalException
-     * @throws CloudException
-     */
-    @Override
-    public Storage<org.dasein.util.uom.storage.Byte> getMaxObjectSize() throws InternalException, CloudException {
-        return new Storage<org.dasein.util.uom.storage.Byte>(Long.MAX_VALUE, Storage.BYTE);
-    }
-
-    /**
-     * According to this <a href=http://apidocs.joyent.com/manta/#directories>doc</a> Manta limits objects per single
-     * directory to 1,000,000.
-     *
-     * @return objects limit per single directory
-     * @throws CloudException
-     * @throws InternalException
-     */
-    @Override
-    public int getMaxObjectsPerBucket() throws CloudException, InternalException {
-        return 1000000;
-    }
-
-    private final char[] BUCKET_CHARS = {'-', '.'};
-
-    @Override
-    public @Nonnull
-    NamingConstraints getBucketNameRules() throws CloudException, InternalException {
-        return NamingConstraints.getAlphaNumeric(1, 255).lowerCaseOnly().limitedToLatin1().constrainedBy(BUCKET_CHARS);
-    }
-
-    private final char[] OBJECT_CHARS = {'-', '.', ',', '#', '+'};
-    @Override
-    public @Nonnull NamingConstraints getObjectNameRules() throws CloudException, InternalException {
-        return NamingConstraints.getAlphaNumeric(1, 255).lowerCaseOnly().limitedToLatin1().constrainedBy(OBJECT_CHARS);
-    }
-
-    /**
-     * Provider term for bucket in Manta is "directory".
-     *
-     * @param locale
-     * @return
-     */
-    @Nonnull
-    @Override
-    public String getProviderTermForBucket(@Nonnull Locale locale) {
-        return "directory";
-    }
-
-    /**
-     *
-     * @param locale
-     * @return
-     */
-    @Nonnull
-    @Override
-    public String getProviderTermForObject(@Nonnull Locale locale) {
-        return "object";
     }
 
     /**
@@ -496,9 +425,26 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
                 cache.put(getProvider().getContext(), Collections.singleton(false));
                 return false;
             }
-            throw new CloudException(ex);
+            int code = ex.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception checking if manta support is subscribed", ex, errorType);
         } catch (Exception ex) {
-            throw new CloudException(ex);
+            throw new GeneralCloudException("Exception checking if manta support is subscribed", ex, CloudErrorType.GENERAL);
         }
     }
 
@@ -512,13 +458,34 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
         try {
             mantaObjects = mantaClient.listObjects(toStoragePath(bucket, null, !isPublic(bucket, null)));
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception listing buckets", e, CloudErrorType.GENERAL);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception listing buckets", e);
         } catch (MantaObjectException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception listing buckets", e, CloudErrorType.GENERAL);
         } catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception listing buckets", e, errorType);
         }
         for (MantaObject mantaObject : mantaObjects) {
             if (mantaObject.isDirectory()) {
@@ -590,7 +557,7 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
         try {
             mantaClient.delete(path);
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception removing bucket", e, CloudErrorType.GENERAL);
         } catch (IOException e) {
             retryRecursively = true;
             logger.debug("Directory is not empty. Delete recursively.", e);
@@ -603,11 +570,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             try {
                 mantaClient.deleteRecursive(path);
             } catch (MantaCryptoException ex) {
-                throw new CloudException(ex);
+                throw new GeneralCloudException("Exception removing bucket", ex, CloudErrorType.GENERAL);
             } catch (MantaClientHttpResponseException ex) {
-                throw new CloudException(ex);
+                int code = ex.getStatusCode();
+                CloudErrorType errorType;
+
+                switch (code) {
+                    case HttpStatus.SC_BAD_REQUEST:
+                        errorType = CloudErrorType.INVALID_USER_DATA;
+                        break;
+                    case HttpStatus.SC_UNAUTHORIZED:
+                    case HttpStatus.SC_FORBIDDEN:
+                        errorType = CloudErrorType.AUTHENTICATION;
+                        break;
+                    case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                        errorType = CloudErrorType.COMMUNICATION;
+                        break;
+                    case 429: //Too many requests
+                        errorType = CloudErrorType.THROTTLING;
+                        break;
+                    default:
+                        errorType = CloudErrorType.GENERAL;
+                        break;
+                }
+                throw new GeneralCloudException("Exception removing bucket", ex, errorType);
             } catch (IOException ex) {
-                throw new CloudException(ex);
+                throw new CommunicationException("Exception removing bucket", ex);
             }
         }
     }
@@ -627,11 +615,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
         try {
             mantaClient.delete(toStoragePath(bucket, object, !isPublic(bucket, object)));
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception removing object", e, CloudErrorType.GENERAL);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception removing object", e);
         } catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception removing object", e, errorType);
         }
     }
 
@@ -672,11 +681,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             mantaClient.putSnapLink(linkPath, objPath, null);
             mantaClient.delete(objPath);
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception renaming object", e, CloudErrorType.GENERAL);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception renaming object", e);
         } catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception renaming object", e, errorType);
         }
     }
 
@@ -814,13 +844,34 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             FileUtils.copyInputStreamToFile(mantaObject.getDataInputStream(), toFile);
         }
         catch( MantaCryptoException e ) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception downloading object content", e, CloudErrorType.GENERAL);
         }
         catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception downloading object content", e, errorType);
         }
         catch( IOException e ) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception downloading object content", e);
         }
     }
 
@@ -843,11 +894,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             mantaObject.setDataInputFile(file);
             mantaClient.put(mantaObject);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception uploading object content", e);
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception uploading object content", e, CloudErrorType.GENERAL);
         } catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception uploading object content", e, errorType);
         }
     }
 
@@ -870,11 +942,32 @@ public class Manta extends AbstractBlobStoreSupport<SmartDataCenter>  {
             mantaObject.setDataInputString(content);
             mantaClient.put(mantaObject);
         } catch (IOException e) {
-            throw new CloudException(e);
+            throw new CommunicationException("Exception uoloading object content", e);
         } catch (MantaCryptoException e) {
-            throw new CloudException(e);
+            throw new GeneralCloudException("Exception uploading object content", e, CloudErrorType.GENERAL);
         } catch( MantaClientHttpResponseException e ) {
-            throw new CloudException(e);
+            int code = e.getStatusCode();
+            CloudErrorType errorType;
+
+            switch (code) {
+                case HttpStatus.SC_BAD_REQUEST:
+                    errorType = CloudErrorType.INVALID_USER_DATA;
+                    break;
+                case HttpStatus.SC_UNAUTHORIZED:
+                case HttpStatus.SC_FORBIDDEN:
+                    errorType = CloudErrorType.AUTHENTICATION;
+                    break;
+                case HttpStatus.SC_SERVICE_UNAVAILABLE:
+                    errorType = CloudErrorType.COMMUNICATION;
+                    break;
+                case 429:
+                    errorType = CloudErrorType.THROTTLING;
+                    break;
+                default:
+                    errorType = CloudErrorType.GENERAL;
+                    break;
+            }
+            throw new GeneralCloudException("Exception uploading object content", e, errorType);
         }
     }
 

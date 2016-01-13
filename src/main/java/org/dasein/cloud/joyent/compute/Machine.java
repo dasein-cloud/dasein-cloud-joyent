@@ -20,8 +20,25 @@
 package org.dasein.cloud.joyent.compute;
 
 import org.apache.log4j.Logger;
-import org.dasein.cloud.*;
-import org.dasein.cloud.compute.*;
+import org.dasein.cloud.CloudErrorType;
+import org.dasein.cloud.CloudException;
+import org.dasein.cloud.GeneralCloudException;
+import org.dasein.cloud.InternalException;
+import org.dasein.cloud.ResourceNotFoundException;
+import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
+import org.dasein.cloud.compute.AbstractVMSupport;
+import org.dasein.cloud.compute.Architecture;
+import org.dasein.cloud.compute.ImageClass;
+import org.dasein.cloud.compute.MachineImage;
+import org.dasein.cloud.compute.MachineImageSupport;
+import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VMLaunchOptions;
+import org.dasein.cloud.compute.VirtualMachine;
+import org.dasein.cloud.compute.VirtualMachineCapabilities;
+import org.dasein.cloud.compute.VirtualMachineProduct;
+import org.dasein.cloud.compute.VirtualMachineProductFilterOptions;
+import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.joyent.JoyentException;
 import org.dasein.cloud.joyent.JoyentMethod;
@@ -32,16 +49,19 @@ import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.storage.Megabyte;
 import org.dasein.util.uom.storage.Storage;
-import org.dasein.util.uom.time.Day;
 import org.dasein.util.uom.time.TimePeriod;
-import org.dasein.util.uom.time.TimePeriodUnit;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class Machine extends AbstractVMSupport<SmartDataCenter> {
     Logger logger = SmartDataCenter.getLogger(Machine.class, "std");
@@ -158,7 +178,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
             return toVirtualMachine(new JSONObject(json));
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -223,13 +243,13 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         String json = method.doPostString(provider.getEndpoint(), "machines", new JSONObject(post).toString());
 
         if( json == null ) {
-            throw new CloudException("No machine was created");
+            throw new GeneralCloudException("No machine was created", CloudErrorType.GENERAL);
         }
         try {
             return toVirtualMachine(new JSONObject(json));
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -308,7 +328,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         MachineImageSupport imageSupport = getProvider().getComputeServices().getImageSupport();
         MachineImage image = imageSupport.getImage(machineImageId);
         if( image == null ) {
-            throw new CloudException("Requested " + imageSupport.getCapabilities().getProviderTermForImage(Locale.getDefault(), ImageClass.MACHINE) + " (" + machineImageId + ") cannot be found.");
+            throw new ResourceNotFoundException("Requested " + imageSupport.getCapabilities().getProviderTermForImage(Locale.getDefault(), ImageClass.MACHINE) + " (" + machineImageId + ") cannot be found.");
         }
         Iterable<VirtualMachineProduct> allProducts = listProducts(options);
         List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
@@ -389,7 +409,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
             return products;
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -411,7 +431,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
             return vms;
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -433,7 +453,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
             return vms;
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -463,7 +483,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         VirtualMachine vm = getVirtualMachine(vmId);
         
         if( vm == null ) {
-            throw new CloudException("No such server: " + vmId);
+            return;
         }
         VmState currentState = vm.getCurrentState();
         while( VmState.PENDING.equals(currentState) && System.currentTimeMillis() < timeout ) {
@@ -685,7 +705,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
             return vm;
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
@@ -731,7 +751,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
             return new ResourceStatus(vmId, state);
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 
