@@ -32,26 +32,6 @@
       <tag>HEAD</tag>
   </scm>
 
-    <profiles>
-        <profile>
-            <id>default</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <properties>
-                <skipUnit>false</skipUnit>
-                <skipIntegration>true</skipIntegration>
-            </properties>
-        </profile>
-        <profile>
-            <id>integration</id>
-            <properties>
-                <skipUnit>true</skipUnit>
-                <skipIntegration>false</skipIntegration>
-            </properties>
-        </profile>
-    </profiles>
-
     <dependencies>
         <!-- Compile -->
         <dependency>
@@ -205,17 +185,19 @@
                 <artifactId>maven-release-plugin</artifactId>
                 <version>2.5.3</version>
             </plugin>
-
             <!-- unit tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.18.1</version>
                 <configuration>
-                    <skipTests>${skipUnit}</skipTests>
                     <excludes>
                         <exclude>**/TestSuite.class</exclude>
                     </excludes>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                    </includes>
                 </configuration>
             </plugin>
 
@@ -223,9 +205,8 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>2.6</version>
+                <version>2.18.1</version>
                 <configuration>
-                    <skipTests>${skipIntegration}</skipTests>
                     <systemProperties>
                         <property>
                             <name>providerClass</name>
@@ -287,6 +268,8 @@
                     <includes>
                         <include>**/TestSuite.java</include>
                     </includes>
+                    <forkCount>0</forkCount>
+                    <reuseForks>false</reuseForks>
                     <argLine>-Dapple.awt.UIElement=true</argLine>
                 </configuration>
                 <executions>
@@ -389,4 +372,43 @@
             <timezone>-8</timezone>
         </developer>
     </developers>
+    <profiles>
+        <profile>
+            <id>skipIntegration</id>
+            <activation>
+                <property><name>!providerClass</name></property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>skipUnit</id>
+            <activation>
+                <property>
+                    <name>skipUnit</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
