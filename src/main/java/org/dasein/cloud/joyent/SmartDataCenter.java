@@ -160,7 +160,7 @@ public class SmartDataCenter extends AbstractCloud {
                     return endpoint;
                 }
             }
-            throw new ResourceNotFoundException("No endpoint exists for " + r);
+            throw new ResourceNotFoundException("Endpoint for region", r);
         }
         catch( JSONException ex ) {
             throw new InternalException(ex);

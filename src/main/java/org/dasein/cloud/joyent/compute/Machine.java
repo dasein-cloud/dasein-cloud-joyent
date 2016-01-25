@@ -29,7 +29,6 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.MachineImageSupport;
 import org.dasein.cloud.compute.Platform;
@@ -60,7 +59,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 public class Machine extends AbstractVMSupport<SmartDataCenter> {
@@ -328,7 +326,7 @@ public class Machine extends AbstractVMSupport<SmartDataCenter> {
         MachineImageSupport imageSupport = getProvider().getComputeServices().getImageSupport();
         MachineImage image = imageSupport.getImage(machineImageId);
         if( image == null ) {
-            throw new ResourceNotFoundException("Requested " + imageSupport.getCapabilities().getProviderTermForImage(Locale.getDefault(), ImageClass.MACHINE) + " (" + machineImageId + ") cannot be found.");
+            throw new ResourceNotFoundException("Image", machineImageId);
         }
         Iterable<VirtualMachineProduct> allProducts = listProducts(options);
         List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();

@@ -85,7 +85,7 @@ public class Dataset extends AbstractImageSupport<SmartDataCenter> {
         try {
             VirtualMachine vm = getProvider().getComputeServices().getVirtualMachineSupport().getVirtualMachine(options.getVirtualMachineId());
             if( vm == null ) {
-                throw new ResourceNotFoundException("Virtual machine not found: " + options.getVirtualMachineId());
+                throw new ResourceNotFoundException("Virtual machine", options.getVirtualMachineId());
             }
             String originalImageId = vm.getProviderMachineImageId();
             if( originalImageId == null ) {

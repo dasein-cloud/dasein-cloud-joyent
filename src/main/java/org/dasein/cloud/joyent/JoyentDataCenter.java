@@ -87,7 +87,7 @@ public class JoyentDataCenter implements DataCenterServices {
         Region r = getRegion(providerRegionId);
         
         if( r == null ) {
-            throw new ResourceNotFoundException("No such region: " + providerRegionId);
+            throw new ResourceNotFoundException("Region", providerRegionId);
         }
         DataCenter dc = new DataCenter();
         dc.setActive(true);
