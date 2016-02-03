@@ -19,21 +19,26 @@
 
 package org.dasein.cloud.joyent;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Locale;
-
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.dc.*;
+import org.dasein.cloud.ResourceNotFoundException;
+import org.dasein.cloud.dc.DataCenter;
+import org.dasein.cloud.dc.DataCenterCapabilities;
+import org.dasein.cloud.dc.DataCenterServices;
+import org.dasein.cloud.dc.Folder;
+import org.dasein.cloud.dc.Region;
+import org.dasein.cloud.dc.ResourcePool;
+import org.dasein.cloud.dc.StoragePool;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 
 public class JoyentDataCenter implements DataCenterServices {
     private SmartDataCenter provider;
@@ -54,13 +59,10 @@ public class JoyentDataCenter implements DataCenterServices {
     public @Nullable DataCenter getDataCenter(@Nonnull String providerDataCenterId) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
         
-        if( ctx == null ) {
-            throw new CloudException("No context exists for this request");
-        }
         String regionId = ctx.getRegionId();
         
         if( regionId == null ) {
-            throw new CloudException("No data center is established for this request");
+            throw new InternalException("No data center is established for this request");
         }
         for( DataCenter dc : listDataCenters(regionId) ) {
             if( dc.getProviderDataCenterId().equals(providerDataCenterId) ) {
@@ -68,16 +70,6 @@ public class JoyentDataCenter implements DataCenterServices {
             }
         }
         return null;
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForDataCenter(@Nonnull Locale locale) {
-        return "dc zone";
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForRegion(@Nonnull Locale locale) {
-        return "data center";
     }
 
     @Override
@@ -95,7 +87,7 @@ public class JoyentDataCenter implements DataCenterServices {
         Region r = getRegion(providerRegionId);
         
         if( r == null ) {
-            throw new CloudException("No such region: " + providerRegionId);
+            throw new ResourceNotFoundException("Region", providerRegionId);
         }
         DataCenter dc = new DataCenter();
         dc.setActive(true);
@@ -131,7 +123,7 @@ public class JoyentDataCenter implements DataCenterServices {
             return regions;
         }
         catch( JSONException e ) {
-            throw new CloudException(e);
+            throw new InternalException(e);
         }
     }
 

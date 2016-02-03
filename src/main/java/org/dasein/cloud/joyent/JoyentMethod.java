@@ -19,14 +19,6 @@
 
 package org.dasein.cloud.joyent;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Date;
-import java.util.Map;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -41,8 +33,23 @@ import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
-import org.dasein.cloud.*;
-import org.dasein.security.joyent.*;
+import org.dasein.cloud.CloudErrorType;
+import org.dasein.cloud.CloudException;
+import org.dasein.cloud.CommunicationException;
+import org.dasein.cloud.GeneralCloudException;
+import org.dasein.cloud.InternalException;
+import org.dasein.cloud.RequestTrackingStrategy;
+import org.dasein.security.joyent.DefaultClientFactory;
+import org.dasein.security.joyent.JoyentClientFactory;
+import org.dasein.security.joyent.JoyentHttpAuth;
+import org.dasein.security.joyent.SignatureHttpAuth;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Date;
+import java.util.Map;
 
 public class JoyentMethod {
     static private final Logger logger = SmartDataCenter.getLogger(JoyentMethod.class, "std");
@@ -125,14 +132,14 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
                 
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -220,7 +227,7 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
 
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
@@ -247,7 +254,7 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 return json;
             }
@@ -329,7 +336,7 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
                 
@@ -352,7 +359,7 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("doGetStream(): Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 if( wire.isDebugEnabled() ) {
                     wire.debug("---> Binary Data <---");
@@ -447,7 +454,7 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
 
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
@@ -455,7 +462,7 @@ public class JoyentMethod {
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -479,7 +486,7 @@ public class JoyentMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     if( json != null && !json.trim().equals("") ) {
                         return json;
@@ -579,7 +586,7 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
 
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
@@ -587,7 +594,7 @@ public class JoyentMethod {
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -611,7 +618,7 @@ public class JoyentMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     if( json != null && !json.trim().equals("") ) {
                         return json;
@@ -690,7 +697,7 @@ public class JoyentMethod {
                 }
             }
             if( responseHash != null && md5Hash != null && !responseHash.equals(md5Hash) ) {
-                throw new CloudException("MD5 hash values do not match, probably data corruption");
+                throw new GeneralCloudException("MD5 hash values do not match, probably data corruption", CloudErrorType.GENERAL);
             }
             if( code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_CREATED ) {
                 logger.error("Expected ACCEPTED or NO CONTENT for POST request, got " + code);
@@ -709,14 +716,14 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
                 
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -741,7 +748,7 @@ public class JoyentMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     if( json != null && !json.trim().equals("") ) {
                         return json;
@@ -836,14 +843,14 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
                 
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -867,7 +874,7 @@ public class JoyentMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     if( json != null && !json.trim().equals("") ) {
                         return json;
@@ -957,14 +964,14 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
                 
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -988,7 +995,7 @@ public class JoyentMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     if( json != null && !json.trim().equals("") ) {
                         return json;
@@ -1069,7 +1076,7 @@ public class JoyentMethod {
                 }
             }
             if( responseHash != null && md5Hash != null && !responseHash.equals(md5Hash) ) {
-                throw new CloudException("MD5 hash values do not match, probably data corruption");
+                throw new GeneralCloudException("MD5 hash values do not match, probably data corruption", CloudErrorType.GENERAL);
             }
 
             if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
@@ -1089,14 +1096,14 @@ public class JoyentMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    throw new CloudException(e);
+                    throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                 }
                 JoyentException.ExceptionItems items = JoyentException.parseException(code, json);
                 
                 if( items == null ) {
                     items = new JoyentException.ExceptionItems();
                     items.code = 404;
-                    items.type = CloudErrorType.COMMUNICATION;
+                    items.type = CloudErrorType.RESOURCE_NOT_FOUND;
                     items.message = "itemNotFound";
                     items.details = "No such object: " + resource;
                 }
@@ -1120,7 +1127,7 @@ public class JoyentMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        throw new CloudException(e);
+                        throw new CommunicationException("Failed to read response error due to a cloud I/O error: " + e.getMessage(), e);
                     }
                     if( json != null && !json.trim().equals("") ) {
                         return json;

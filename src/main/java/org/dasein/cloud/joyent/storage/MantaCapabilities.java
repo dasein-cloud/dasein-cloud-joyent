@@ -40,16 +40,39 @@ public class MantaCapabilities extends AbstractCapabilities<SmartDataCenter> imp
         super(provider);
     }
 
+    /**
+     * Manta supports directories with sub-directories in /:login/stor or /:login/public.
+     *
+     *
+     * @throws CloudException
+     * @throws InternalException
+     * @return
+     */
     @Override
     public boolean allowsNestedBuckets() throws CloudException, InternalException {
-        return false;
+        return true;
     }
 
+    /**
+     * Manta does not support objects on root level. However, user must specify one of two available storage folders:
+     * /:login/stor or /:login/public which will be used as a root level.
+     *
+     * @throws CloudException
+     * @throws InternalException
+     * @return
+     */
     @Override
     public boolean allowsRootObjects() throws CloudException, InternalException {
         return false;
     }
 
+    /**
+     * Manta allow public sharing using directory /:login/public
+     *
+     * @return
+     * @throws CloudException
+     * @throws InternalException
+     */
     @Override
     public boolean allowsPublicSharing() throws CloudException, InternalException {
         return true;
@@ -66,9 +89,17 @@ public class MantaCapabilities extends AbstractCapabilities<SmartDataCenter> imp
         return MAX_OBJECT_SIZE;
     }
 
+    /**
+     * According to this <a href=http://apidocs.joyent.com/manta/#directories>doc</a> Manta limits objects per single
+     * directory to 1,000,000.
+     *
+     * @return objects limit per single directory
+     * @throws CloudException
+     * @throws InternalException
+     */
     @Override
     public int getMaxObjectsPerBucket() throws CloudException, InternalException {
-        return MAX_OBJECTS;
+        return 1000000;
     }
 
     @Nonnull
@@ -86,7 +117,7 @@ public class MantaCapabilities extends AbstractCapabilities<SmartDataCenter> imp
     @Nonnull
     @Override
     public String getProviderTermForBucket(@Nonnull Locale locale) {
-        return "bucket";
+        return "directory";
     }
 
     @Nonnull

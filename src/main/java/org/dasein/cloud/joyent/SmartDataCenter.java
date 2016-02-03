@@ -19,17 +19,15 @@
 
 package org.dasein.cloud.joyent;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TimeZone;
-
 import org.apache.log4j.Logger;
-import org.dasein.cloud.*;
+import org.dasein.cloud.AbstractCloud;
+import org.dasein.cloud.CloudErrorType;
+import org.dasein.cloud.CloudException;
+import org.dasein.cloud.ContextRequirements;
+import org.dasein.cloud.InternalException;
+import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.ResourceNotFoundException;
 import org.dasein.cloud.joyent.compute.JoyentComputeServices;
-import org.dasein.cloud.joyent.storage.MantaStorageServices;
-import org.dasein.cloud.storage.StorageServices;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -37,6 +35,11 @@ import org.json.JSONObject;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TimeZone;
 
 public class SmartDataCenter extends AbstractCloud {
     static private @Nonnull String getLastItem(@Nonnull String name) {
@@ -106,9 +109,6 @@ public class SmartDataCenter extends AbstractCloud {
     public @Nonnull String getEndpoint() throws CloudException, InternalException {
         ProviderContext ctx = getContext();
 
-        if( ctx == null ) {
-            throw new CloudException("No context has been established for this request");
-        }
         String e = ctx.getCloud().getEndpoint();
         
         if( e == null ) { 
@@ -160,10 +160,10 @@ public class SmartDataCenter extends AbstractCloud {
                     return endpoint;
                 }
             }
-            throw new CloudException("No endpoint exists for " + r);
+            throw new ResourceNotFoundException("Endpoint for region", r);
         }
         catch( JSONException ex ) {
-            throw new CloudException(ex);
+            throw new InternalException(ex);
         }        
     }
     
@@ -172,7 +172,7 @@ public class SmartDataCenter extends AbstractCloud {
         return "Joyent";
     }
     
-    public @Nonnegative long parseTimestamp(String time) throws CloudException {
+    public @Nonnegative long parseTimestamp(String time) throws InternalException {
         if( time == null ) {
             return 0L;
         }
@@ -180,7 +180,7 @@ public class SmartDataCenter extends AbstractCloud {
         if (idx < 0) {
             idx = time.lastIndexOf('Z');
             if (idx < 0) {
-                throw new CloudException("Could not parse timestamp: " + time);
+                throw new InternalException("Could not parse timestamp: " + time);
             }
             time = time.substring(0,idx);
         } else {
@@ -196,7 +196,7 @@ public class SmartDataCenter extends AbstractCloud {
                 try {
                     return fmt.parse(time).getTime();
                 } catch (ParseException e2) {
-                    throw new CloudException("Could not parse timestamp: " + time, e2);
+                    throw new InternalException("Could not parse timestamp: " + time, e2);
                 }
             }
         }
@@ -214,9 +214,6 @@ public class SmartDataCenter extends AbstractCloud {
             try {
                 ProviderContext ctx = getContext();
 
-                if( ctx == null ) {
-                    return null;
-                }
                 String pk = ctx.getAccountNumber();
 
                 JoyentMethod method = new JoyentMethod(this);
